@@ -110,8 +110,16 @@ def get_frame_times_features_by_path(session: Session, path: str):
         .order_by(Video.frame_time)
         .all()
     )
+    if not l: # Handle case where video has no frames
+        return [], []
     frame_times, features = zip(*l)
     return frame_times, features
+
+
+def get_just_frame_times_by_path(session: Session, path: str) -> list[int]:
+    """Retrieves a sorted list of frame_time (integer seconds) for the given video_path."""
+    frame_times, _ = get_frame_times_features_by_path(session, path)
+    return list(frame_times)
 
 
 def get_video_count(session: Session):

@@ -131,3 +131,74 @@ def resize_image_with_aspect_ratio(image_path, target_size, convert_rgb=False):
     # 调整图像的大小
     resized_image = image.resize((new_width, new_height))
     return resized_image
+
+
+def seconds_to_hmsf(seconds: float, fps: float) -> str:
+    """Converts seconds to HH:MM:SS:FF format."""
+    if fps <= 0:
+        # Avoid division by zero or negative FPS, default to a common video FPS if invalid
+        logger.warning(f"Invalid FPS value {fps} received, defaulting to 25.0 for HMSF conversion.")
+        fps = 25.0 
+    
+    total_frames_exact = seconds * fps
+    # It's common to take the floor of total_frames for frame number calculation
+    # e.g. second 0.0 to (1/fps - epsilon) is frame 0
+    
+    ss_float = seconds
+    
+    hh = int(ss_float // 3600)
+    mm = int((ss_float % 3600) // 60)
+    ss = int(ss_float % 60)
+    
+    # Frame number is the number of full frames that have passed
+    # For second 1.0, if FPS is 30, it's the 0th frame of second 1, or 30th frame of video.
+    # The "FF" part usually means the frame index within the current second.
+    # (seconds - int(seconds)) * fps gives the frame count into the current second.
+    frame_within_second = int(round((ss_float - int(ss_float)) * fps))
+
+    # Ensure frame number doesn't exceed fps-1, could happen due to rounding if ss_float is x.99999...
+    if frame_within_second >= fps : # If calculated frame is, say, 30 for 30fps, it should be frame 29.
+        frame_within_second = int(fps -1) if fps >0 else 0
+        # Or, if it implies rolling over to the next second:
+        # ss += 1 # and then recalculate hh, mm, ss, frame_within_second = 0
+        # For simplicity, capping at fps-1 is common for HH:MM:SS:FF representation.
+
+    return f"{hh:02d}:{mm:02d}:{ss:02d}:{frame_within_second:02d}"
+
+
+def get_video_fps(video_path: str) -> float | None:
+    """
+    Retrieves the FPS of a video file using OpenCV.
+
+    Args:
+        video_path: Path to the video file.
+
+    Returns:
+        The FPS of the video as a float, or None if an error occurs
+        (e.g., file not found, cannot open, invalid FPS).
+    """
+    if not os.path.exists(video_path):
+        logger.error(f"get_video_fps: Video file not found at {video_path}")
+        return None
+    
+    try:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            logger.error(f"get_video_fps: Failed to open video file: {video_path}")
+            return None
+        
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        
+        if fps is None or fps <= 0:
+            logger.warning(f"get_video_fps: Invalid or zero FPS ({fps}) detected for video: {video_path}")
+            return None
+            
+        return fps
+    except Exception as e:
+        logger.error(f"get_video_fps: An exception occurred while trying to get FPS for {video_path}: {e}", exc_info=True)
+        return None
+
+# Need to import os and cv2 for get_video_fps
+import os
+import cv2 # Assuming opencv-python is installed
